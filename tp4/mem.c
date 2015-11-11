@@ -106,6 +106,9 @@ void *proc2 (int semid) {
 	prendre(semid, 1);
     for (s = shm; *s != NULL; s++) {
 		*s = tolower(*s);
+		//On transfert les majuscules en miniscules dans la memoire partagee
+		*shm = tolower(*s);
+		shm++;
 		printf("%c",*s);
 	}
 	printf("\n");
