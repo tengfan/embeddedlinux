@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <ctype.h>
 #include <sys/ipc.h>
+#include <sys/types.h>
+#include <sys/shm.h> 
 #include <sys/sem.h>
 
 //Fonction permettant de rendre le semaphore no de l'ensemble semid
@@ -38,42 +40,86 @@ void prendre(int semid, int no){
 }
 
 void *proc1 (int semid) {
-	//printf("thread 1 : create\n");
-	int i;
-	for(i='A';i<'Z'+1;i++){
-		prendre(semid, 0);
-		printf("%c",i);
-		fflush (stdout);// flushing or repositioning required
-		rendre(semid, 1);
-	}
+	char c;
+    int shmid;
+    key_t key;
+    char *shm, *s;
+	char shm_init = 27;
+
+    /*
+     * la cle de la memoire partagee = "1234".
+     */
+    key = 1234;
+
+    /*
+     * Creer le segment.
+     */
+    if ((shmid = shmget(key, shm_init, IPC_CREAT | 0666)) < 0) {
+        perror("shmget");
+        exit(1);
+    }
+
+	/*
+	 * Attacher le segment de memoire partagee
+	*/
+    if ((shm = shmat(shmid, NULL, 0)) == (char *) -1) {
+        perror("shmat");
+        exit(1);
+    }
+    s = shm;
+	prendre(semid, 0);
+    for (c = 'A'; c <= 'Z'; c++) *s++ = c;
+	rendre(semid,1);
+
+	*s = NULL;
+	
 	exit(0);
 }
 
 void *proc2 (int semid) {
-	//printf("thread 2 : create\n");
-	int i;
-	for(i='a';i<'z'+1;i++){
-		prendre(semid, 1);
-		printf("%c",i);
-		fflush (stdout);// flushing or repositioning required
-		rendre(semid, 0);
+	int shmid;
+    key_t key;
+    char *shm, *s;
+	char shm_init = 27;
+
+    key = 1234;
+
+    /*
+     * trouver le segment.
+     */
+    if ((shmid = shmget(key, shm_init, 0666)) < 0) {
+        perror("shmget");
+        exit(1);
+    }
+
+    /*
+     *Attacher le segment de la memoire partagee
+     */
+    if ((shm = shmat(shmid, NULL, 0)) == (char *) -1) {
+        perror("shmat");
+        exit(1);
+    }
+
+    /*
+     * Demande le continu dans la memoire partagee
+     */
+	prendre(semid, 1);
+    for (s = shm; *s != NULL; s++) {
+		*s = tolower(*s);
+		printf("%c",*s);
 	}
-	exit(0);
+	printf("\n");
+	rendre(semid, 0);
+
+    exit(0);
 }
 
 int main(int argc, char argv[]) {
 	int pid1, pid2;
 	int ret1 = 0;
 	int ret2 = 0;
-	//Semaphore
 	key_t cle;
 	int er;
-	/*
-	cle = ftok("/home/eleves/promo16/elec/fan/Documents/embeddedLinux/tp3/tp3_prog2.log",0);
-	if(cle == (key_t) -1) {
-		perror("erreur ftok\n");
-		exit(1);
-	}*/
 	int semid;
 	semid = semget(cle,2,IPC_CREAT|0666);
 	if(semid == -1) {
